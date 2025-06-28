@@ -6,10 +6,9 @@ import re
 import os
 import warnings
 from sklearn.exceptions import UndefinedMetricWarning
-
-
-# --- FIX: Use a non-interactive backend to prevent the PyCapsule error ---
 import matplotlib
+
+
 matplotlib.use('Agg')
 # Suppress the specific warning from RANSAC on small samples
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
