@@ -1,7 +1,7 @@
 # ==============================================================================
 # Self-Driving Agent for Racing Games
 #
-# Author: [Your Name/Alias]
+# Author: Matthew Nader
 # Version: 5.2.0
 #
 # Description:
