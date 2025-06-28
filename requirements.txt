@@ -1,0 +1,10 @@
+opencv-python 
+numpy 
+mss 
+pyautogui 
+keyboard 
+flask 
+waitress 
+scikit-learn 
+pandas 
+scipy 

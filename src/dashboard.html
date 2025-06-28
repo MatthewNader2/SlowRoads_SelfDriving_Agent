@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <!-- ============================================================================== -->
+    <!-- Self-Driving Agent Dashboard                                                   -->
+    <!-- Version: 2.0.0                                                                 -->
+    <!--                                                                                -->
+    <!-- This file provides the user interface for monitoring and controlling the       -->
+    <!-- self-driving agent. It communicates with the Python backend via a REST API.    -->
+    <!-- ============================================================================== -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Control Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚗</text></svg>">
+    <!-- External Libraries -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* --- THEME & CSS VARIABLES --- */
+        :root {
+            --bg-color: #121212;
+            --panel-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --text-muted: #888;
+            --accent-color: #007bff;
+            --accent-hover: #0056b3;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --info-color: #17a2b8;
+            --warning-color: #ffc107;
+            --border-color: #333;
+            --glow-color: rgba(0, 123, 255, 0.7);
+        }
+
+        /* --- BASE & LAYOUT --- */
+        * { box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            overflow: hidden; /* Prevent body scroll on desktop */
+        }
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+        }
+        .main-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            gap: 20px;
+        }
+        .video-container {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            background-color: #000;
+            border-radius: 12px;
+            padding: 0;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+        .video-container.expanded {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            border-radius: 0;
+            z-index: 1000;
+            border: none;
+        }
+        .video-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .video-container:not(.expanded):hover img {
+            transform: scale(1.02);
+        }
+        .controls-container {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: 100%;
+            overflow-y: auto;
+        }
+        .panel {
+            background-color: var(--panel-color);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        h2 {
+            color: var(--text-color);
+            margin-top: 0;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            font-weight: 600;
+            font-size: 1.2em;
+        }
+
+        /* --- UI COMPONENTS: BUTTONS, GRIDS, TABS --- */
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .btn:hover { filter: brightness(1.15); }
+        .btn:active { transform: scale(0.97); filter: brightness(0.9); }
+        .btn-primary { background-color: var(--accent-color); color: white; }
+        .btn-success { background-color: var(--success-color); color: white; }
+        .btn-danger { background-color: var(--danger-color); color: white; }
+        .btn-info { background-color: var(--info-color); color: white; }
+        .btn-secondary { background-color: #444; color: white; }
+        .btn-block { width: 100%; }
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 15px;
+        }
+        .status-item {
+            background-color: var(--bg-color);
+            padding: 12px;
+            border-radius: 8px;
+        }
+        .status-item .label {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .status-item .value {
+            font-size: 1.5em;
+            font-weight: 700;
+            transition: color 0.3s ease;
+        }
+        .status-paused { color: var(--accent-color); }
+        .status-running { color: var(--success-color); }
+        .status-tuning { color: var(--info-color); }
+
+        .tab-nav {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+        .tab-nav-btn {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 1em;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tab-nav-btn.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.4s ease; }
+
+        /* --- UI COMPONENTS: SLIDERS & INPUTS --- */
+        .switch-field {
+            display: flex;
+            overflow: hidden;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+        .switch-field input { display: none; }
+        .switch-field label {
+            flex-grow: 1;
+            text-align: center;
+            padding: 10px;
+            background-color: var(--bg-color);
+            color: var(--text-muted);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .switch-field input:checked + label {
+            background-color: var(--accent-color);
+            color: white;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        #manual_controls_fieldset {
+            border: none;
+            padding: 0;
+            margin: 0;
+            transition: opacity 0.3s ease;
+        }
+        #manual_controls_fieldset:disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .slider-group label { flex-basis: 150px; font-weight: 500; font-size: 0.9em; }
+        .slider-group input[type="number"] {
+            width: 80px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 8px;
+            text-align: center;
+        }
+        input[type="range"] {
+            flex-grow: 1; -webkit-appearance: none; appearance: none;
+            height: 6px; background: #333; border-radius: 5px; outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 18px; height: 18px; background: var(--accent-color);
+            cursor: pointer; border-radius: 50%; border: 2px solid white;
+        }
+        .roi-group { margin-bottom: 15px; }
+        .roi-group label { display: block; font-weight: 600; margin-bottom: 8px; }
+        .roi-inputs { display: flex; gap: 10px; }
+        .roi-inputs input {
+            width: 100%; background-color: var(--bg-color); color: var(--text-color);
+            border: 1px solid var(--border-color); border-radius: 5px; padding: 8px;
+        }
+
+        /* --- ANIMATIONS & RESPONSIVENESS --- */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes valueUpdateGlow {
+            0% { text-shadow: 0 0 0px var(--glow-color); }
+            50% { text-shadow: 0 0 10px var(--glow-color); }
+            100% { text-shadow: 0 0 0px var(--glow-color); }
+        }
+        .glow-update { animation: valueUpdateGlow 1s ease-out; }
+
+        @media (max-width: 1200px) {
+            body {
+                flex-direction: column;
+                height: auto;
+                overflow: auto;
+            }
+            .main-container {
+                flex-direction: column;
+                height: auto;
+            }
+            .video-container {
+                min-height: 40vh;
+            }
+            .controls-container {
+                overflow-y: visible;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ========================================================================== -->
+    <!--  MAIN LAYOUT: A two-column flex container for video and controls.          -->
+    <!-- ========================================================================== -->
+    <div class="main-container">
+
+        <!-- Left Column: Video Feed -->
+        <div class="video-container" id="video-wrapper">
+            <img id="video_feed" src="/video_feed" alt="Video Feed">
+        </div>
+
+        <!-- Right Column: Control Panels -->
+        <div class="controls-container">
+
+            <!-- Panel 1: Primary Agent Controls -->
+            <div class="panel">
+                <div class="btn-group">
+                    <button class="btn btn-success btn-block" id="btn_toggle_agent"><i class="fas fa-play"></i><span>Start Agent</span></button>
+                    <button class="btn btn-secondary" id="btn_toggle_video"><i class="fas fa-video"></i><span>Start Recording</span></button>
+                    <button class="btn btn-secondary" id="btn_toggle_log"><i class="fas fa-database"></i><span>Enable Logging</span></button>
+                    <button class="btn btn-secondary" id="btn_toggle_diagnostics"><i class="fas fa-cogs"></i><span>Show Diagnostics</span></button>
+                    <button class="btn btn-danger" id="btn_quit"><i class="fas fa-power-off"></i></button>
+                </div>
+            </div>
+
+            <!-- Panel 2: Real-time Telemetry Chart -->
+            <div class="panel">
+                <h2>Control System Telemetry</h2>
+                <div style="height: 200px;">
+                    <canvas id="realtime-chart-canvas"></canvas>
+                </div>
+                <div class="btn-group" style="margin-top: 15px;">
+                    <button class="btn btn-primary" id="btn_save_chart" style="width: 100%;"><i class="fas fa-download"></i> Save Chart Image</button>
+                </div>
+            </div>
+
+            <!-- Panel 3: Agent Status Grid -->
+            <div class="panel">
+                <h2>Agent Status</h2>
+                <div class="status-grid">
+                    <div class="status-item"><div class="label"><i class="fas fa-info-circle"></i> Status</div><div class="value" id="agent_status">--</div></div>
+                    <div class="status-item"><div class="label"><i class="fas fa-chart-line"></i> Current Score</div><div class="value" id="current_score">--</div></div>
+                    <div class="status-item"><div class="label"><i class="fas fa-trophy"></i> Best Run Score</div><div class="value" id="best_score">--</div></div>
+                    <div class="status-item"><div class="label"><i class="fas fa-crown"></i> Best Ever Score</div><div class="value" id="best_ever_score">--</div></div>
+                    <div class="status-item"><div class="label"><i class="fas fa-tachometer-alt"></i> Steering Signal</div><div class="value" id="control_signal">--</div></div>
+                    <div class="status-item"><div class="label"><i class="fas fa-exclamation-triangle"></i> Current Error</div><div class="value" id="current_error">--</div></div>
+                </div>
+            </div>
+
+            <!-- Panel 4: Tabbed Interface for Tuning and Configuration -->
+            <div class="panel">
+                <nav class="tab-nav">
+                    <button class="tab-nav-btn active" data-tab="tuning"><i class="fas fa-sliders-h"></i> PID Tuning</button>
+                    <button class="tab-nav-btn" data-tab="roi"><i class="fas fa-crop-alt"></i> ROI Config</button>
+                </nav>
+
+                <!-- Tab 1: PID Tuning Controls -->
+                <div id="tab-content-tuning" class="tab-content active">
+                    <div class="switch-field">
+                        <input type="radio" id="mode_auto" name="tuning_mode" value="auto" checked>
+                        <label for="mode_auto"><i class="fas fa-robot"></i> Auto-Tune</label>
+                        <input type="radio" id="mode_manual" name="tuning_mode" value="manual">
+                        <label for="mode_manual"><i class="fas fa-hand-paper"></i> Manual Control</label>
+                    </div>
+
+                    <fieldset id="manual_controls_fieldset">
+                        <div class="slider-group">
+                            <label for="Kp">Kp (Best: <span id="best_kp"></span>)</label>
+                            <input type="range" id="Kp_slider" name="Kp" min="0" max="0.5" step="0.001">
+                            <input type="number" id="Kp_input" name="Kp" step="0.001">
+                        </div>
+                        <div class="slider-group">
+                            <label for="Ki">Ki (Best: <span id="best_ki"></span>)</label>
+                            <input type="range" id="Ki_slider" name="Ki" min="0" max="0.01" step="0.0001">
+                            <input type="number" id="Ki_input" name="Ki" step="0.0001">
+                        </div>
+                        <div class="slider-group">
+                            <label for="Kd">Kd (Best: <span id="best_kd"></span>)</label>
+                            <input type="range" id="Kd_slider" name="Kd" min="0" max="5.0" step="0.01">
+                            <input type="number" id="Kd_input" name="Kd" step="0.01">
+                        </div>
+                        <div class="slider-group">
+                            <label for="Gain">Steering Gain</label>
+                            <input type="range" id="Gain_slider" name="Gain" min="0" max="20.0" step="0.1">
+                            <input type="number" id="Gain_input" name="Gain" step="0.1">
+                        </div>
+                    </fieldset>
+                </div>
+
+                <!-- Tab 2: ROI Configuration -->
+                <div id="tab-content-roi" class="tab-content">
+                    <p style="color: var(--text-muted); font-size: 0.9em; margin-top: 0;">
+                        Define screen regions as ratios (0.0 to 1.0). Restart agent to apply changes.
+                    </p>
+                    <div class="roi-group">
+                        <label>Game View Ratios (top, left, width, height)</label>
+                        <div class="roi-inputs">
+                            <input type="text" id="roi_game_top">
+                            <input type="text" id="roi_game_left">
+                            <input type="text" id="roi_game_width">
+                            <input type="text" id="roi_game_height">
+                        </div>
+                    </div>
+                     <div class="roi-group">
+                        <label>Car ROI Ratios (x, y, w, h) - Relative to Game View</label>
+                        <div class="roi-inputs">
+                            <input type="text" id="roi_car_x">
+                            <input type="text" id="roi_car_y">
+                            <input type="text" id="roi_car_w">
+                            <input type="text" id="roi_car_h">
+                        </div>
+                    </div>
+                     <div class="roi-group">
+                        <label>Lane ROI Ratios (x, y, w, h) - Relative to Game View</label>
+                        <div class="roi-inputs">
+                            <input type="text" id="roi_lane_x">
+                            <input type="text" id="roi_lane_y">
+                            <input type="text" id="roi_lane_w">
+                            <input type="text" id="roi_lane_h">
+                        </div>
+                    </div>
+                    <div class="btn-group" style="margin-top: 20px;">
+                        <button class="btn btn-primary" id="btn_save_roi"><i class="fas fa-save"></i> Save as Default</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ==========================================================================
+    // JAVASCRIPT LOGIC
+    // ==========================================================================
+
+    // Global state object to prevent unnecessary DOM updates
+    const uiState = {};
+    // Global variable for the Chart.js instance
+    let realtimeChart = null;
+
+    /**
+     * Sends a command to the Python backend.
+     * @param {string} command - The name of the command to execute.
+     * @param {any} [value=null] - An optional value to send with the command.
+     */
+    function sendControlCommand(command, value = null) {
+        fetch('/control', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command, value })
+        }).catch(error => console.error('Error sending command:', error));
+    }
+
+    /**
+     * Updates a text element's content, applying a glow effect for numeric values.
+     * @param {string} elementId - The ID of the DOM element to update.
+     * @param {any} value - The new value to display.
+     * @param {boolean} [isNumeric=true] - Whether the value is numeric.
+     * @param {number} [precision=2] - The number of decimal places for numeric values.
+     */
+    function updateValue(elementId, value, isNumeric = true, precision = 2) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+
+        const formattedValue = isNumeric ? (value || 0).toFixed(precision) : (value || '--');
+        if (uiState[elementId] !== formattedValue) {
+            uiState[elementId] = formattedValue;
+            element.textContent = formattedValue;
+            if (isNumeric && element.classList.contains('value')) {
+                element.classList.add('glow-update');
+                setTimeout(() => element.classList.remove('glow-update'), 1000);
+            }
+        }
+    }
+
+    /**
+     * Initializes the real-time telemetry chart using Chart.js.
+     */
+    function initializeRealtimeChart() {
+        const ctx = document.getElementById('realtime-chart-canvas').getContext('2d');
+        const config = {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Steering Signal',
+                    data: [],
+                    borderColor: 'rgba(0, 123, 255, 0.8)',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    yAxisID: 'ySignal',
+                    tension: 0.4,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                    fill: true,
+                }, {
+                    label: 'Lane Error (Normalized)',
+                    data: [],
+                    borderColor: 'rgba(255, 193, 7, 0.8)',
+                    yAxisID: 'yError',
+                    tension: 0.4,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                interaction: { intersect: false, mode: 'index' },
+                scales: {
+                    x: { display: false },
+                    ySignal: {
+                        type: 'linear', position: 'left', min: -1.1, max: 1.1,
+                        title: { display: true, text: 'Signal', color: 'rgba(0, 123, 255, 0.8)' },
+                        ticks: { color: '#888' }, grid: { color: '#333' }
+                    },
+                    yError: {
+                        type: 'linear', position: 'right', min: -1.1, max: 1.1,
+                        title: { display: true, text: 'Error', color: 'rgba(255, 193, 7, 0.8)' },
+                        ticks: { color: '#888' }, grid: { drawOnChartArea: false }
+                    }
+                },
+                plugins: { legend: { position: 'top', labels: { color: '#e0e0e0' } } }
+            }
+        };
+        realtimeChart = new Chart(ctx, config);
+    }
+
+    /**
+     * The main UI update function. Fetches status from the backend and updates all
+     * relevant UI elements, including buttons, text, sliders, and the chart.
+     * @param {object} status - The status object received from the backend.
+     */
+    function updateUI(status) {
+        // --- Update Buttons ---
+        const agentBtn = document.getElementById('btn_toggle_agent');
+        const isRunning = status.agent_status === 'Running' || status.agent_status === 'Genetic Tuning';
+        agentBtn.querySelector('span').textContent = isRunning ? 'Stop Agent' : 'Start Agent';
+        agentBtn.className = isRunning ? 'btn btn-danger btn-block' : 'btn btn-success btn-block';
+        agentBtn.querySelector('i').className = isRunning ? 'fas fa-stop' : 'fas fa-play';
+
+        const diagBtn = document.getElementById('btn_toggle_diagnostics');
+        diagBtn.querySelector('span').textContent = status.diagnostics_on ? 'Hide Diagnostics' : 'Show Diagnostics';
+
+        const videoBtn = document.getElementById('btn_toggle_video');
+        videoBtn.querySelector('span').textContent = status.video_recording ? 'Stop Recording' : 'Start Recording';
+        videoBtn.className = status.video_recording ? 'btn btn-info' : 'btn btn-secondary';
+        videoBtn.querySelector('i').className = status.video_recording ? 'fas fa-stop-circle' : 'fas fa-video';
+
+        const logBtn = document.getElementById('btn_toggle_log');
+        logBtn.querySelector('span').textContent = status.data_logging ? 'Disable Logging' : 'Enable Logging';
+        logBtn.className = status.data_logging ? 'btn btn-info' : 'btn btn-secondary';
+        logBtn.querySelector('i').className = status.data_logging ? 'fas fa-database' : 'fas fa-ban';
+
+        // --- Update Status Text ---
+        const statusEl = document.getElementById('agent_status');
+        if (uiState.agent_status !== status.agent_status) {
+            uiState.agent_status = status.agent_status;
+            statusEl.textContent = status.agent_status;
+            statusEl.className = 'value'; // Reset classes
+            if (status.agent_status === 'Running') statusEl.classList.add('status-running');
+            else if (status.agent_status === 'Paused') statusEl.classList.add('status-paused');
+            else if (status.agent_status === 'Genetic Tuning') statusEl.classList.add('status-tuning');
+        }
+
+        // --- Update Numeric Values ---
+        updateValue('current_score', status.current_score);
+        updateValue('best_score', status.best_score);
+        updateValue('best_ever_score', status.best_ever_score);
+        updateValue('control_signal', status.control_signal);
+        updateValue('current_error', status.current_error);
+        updateValue('best_kp', status.best_pid.kp, true, 4);
+        updateValue('best_ki', status.best_pid.ki, true, 4);
+        updateValue('best_kd', status.best_pid.kd, true, 4);
+
+        // --- Update Sliders and Inputs (only if not focused by the user) ---
+        function updateSlider(sliderId, inputId, value, precision) {
+            const slider = document.getElementById(sliderId);
+            const input = document.getElementById(inputId);
+            if (document.activeElement !== slider && document.activeElement !== input) {
+                slider.value = value;
+                input.value = value.toFixed(precision);
+            }
+        }
+        updateSlider('Kp_slider', 'Kp_input', status.pid.kp, 3);
+        updateSlider('Ki_slider', 'Ki_input', status.pid.ki, 4);
+        updateSlider('Kd_slider', 'Kd_input', status.pid.kd, 2);
+        updateSlider('Gain_slider', 'Gain_input', status.gain, 1);
+
+        // --- Update ROI Inputs (only if not focused) ---
+        function updateRoiInput(inputId, value) {
+            const input = document.getElementById(inputId);
+            if (document.activeElement !== input) {
+                input.value = typeof value === 'number' ? value.toFixed(4) : value;
+            }
+        }
+        if (status.roi_ratios) {
+            updateRoiInput('roi_game_top', status.roi_ratios.game.top);
+            updateRoiInput('roi_game_left', status.roi_ratios.game.left);
+            updateRoiInput('roi_game_width', status.roi_ratios.game.width);
+            updateRoiInput('roi_game_height', status.roi_ratios.game.height);
+            updateRoiInput('roi_car_x', status.roi_ratios.car[0]);
+            updateRoiInput('roi_car_y', status.roi_ratios.car[1]);
+            updateRoiInput('roi_car_w', status.roi_ratios.car[2]);
+            updateRoiInput('roi_car_h', status.roi_ratios.car[3]);
+            updateRoiInput('roi_lane_x', status.roi_ratios.lane[0]);
+            updateRoiInput('roi_lane_y', status.roi_ratios.lane[1]);
+            updateRoiInput('roi_lane_w', status.roi_ratios.lane[2]);
+            updateRoiInput('roi_lane_h', status.roi_ratios.lane[3]);
+        }
+
+        // --- Update Tuning Mode Controls ---
+        const manualFieldset = document.getElementById('manual_controls_fieldset');
+        const autoRadio = document.getElementById('mode_auto');
+        manualFieldset.disabled = (status.tuning_mode === 'auto');
+        if (document.activeElement.name !== 'tuning_mode') {
+            autoRadio.checked = (status.tuning_mode === 'auto');
+            document.getElementById('mode_manual').checked = (status.tuning_mode === 'manual');
+        }
+
+        // --- Update Real-time Chart ---
+        if (realtimeChart) {
+            const MAX_DATA_POINTS = 100;
+            const chartData = realtimeChart.data;
+            chartData.labels.push('');
+            chartData.datasets[0].data.push(status.control_signal);
+            // Normalize error for better visualization (assuming max error ~200px)
+            const normalizedError = Math.max(-1, Math.min(1, status.current_error / 200));
+            chartData.datasets[1].data.push(normalizedError);
+            // Trim old data
+            if (chartData.labels.length > MAX_DATA_POINTS) {
+                chartData.labels.shift();
+                chartData.datasets.forEach(dataset => dataset.data.shift());
+            }
+            realtimeChart.update();
+        }
+    }
+
+    // --- MAIN EXECUTION: Runs after the DOM is fully loaded ---
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize the chart on page load
+        initializeRealtimeChart();
+
+        // Fetch initial status and then set up a periodic poll
+        fetch('/status')
+            .then(response => response.json())
+            .then(data => updateUI(data))
+            .catch(error => console.error('Error fetching initial status:', error));
+
+        setInterval(() => {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => updateUI(data))
+                .catch(error => console.error('Error fetching status:', error));
+        }, 1000);
+
+        // --- Event Listeners for UI Controls ---
+
+        // Primary control buttons
+        document.getElementById('btn_toggle_agent').addEventListener('click', () => {
+            const isRunning = uiState.agent_status === 'Running' || uiState.agent_status === 'Genetic Tuning';
+            sendControlCommand(isRunning ? 'pause_agent' : 'start_agent');
+        });
+        document.getElementById('btn_toggle_diagnostics').addEventListener('click', () => sendControlCommand('toggle_diagnostics'));
+        document.getElementById('btn_toggle_video').addEventListener('click', () => sendControlCommand('toggle_video_recording'));
+        document.getElementById('btn_toggle_log').addEventListener('click', () => sendControlCommand('toggle_data_logging'));
+        document.getElementById('btn_quit').addEventListener('click', () => {
+            if (confirm('Are you sure you want to quit the application?')) sendControlCommand('quit');
+        });
+        document.getElementById('btn_save_chart').addEventListener('click', () => {
+            if (realtimeChart) {
+                const link = document.createElement('a');
+                link.href = realtimeChart.toBase64Image('image/png', 1);
+                link.download = `telemetry-chart-${new Date().toISOString()}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
+
+        // Video feed expansion
+        document.getElementById('video-wrapper').addEventListener('click', (e) => {
+            if (e.target.id === 'video-wrapper' || e.target.id === 'video_feed') {
+                 e.currentTarget.classList.toggle('expanded');
+            }
+        });
+
+        // Tab navigation
+        document.querySelectorAll('.tab-nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+                document.querySelectorAll('.tab-nav-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`tab-content-${tabId}`).classList.add('active');
+            });
+        });
+
+        // Tuning mode radio buttons
+        document.querySelectorAll('input[name="tuning_mode"]').forEach(radio => {
+            radio.addEventListener('change', (event) => sendControlCommand('set_mode', event.target.value));
+        });
+
+        // Function to sync a slider and its corresponding number input
+        function setupSliderSync(sliderId, inputId, command, precision) {
+            const slider = document.getElementById(sliderId);
+            const input = document.getElementById(inputId);
+            slider.addEventListener('input', () => input.value = parseFloat(slider.value).toFixed(precision));
+            input.addEventListener('input', () => slider.value = input.value);
+            const sendUpdate = (event) => {
+                if (document.getElementById('mode_manual').checked) {
+                    sendControlCommand(command, parseFloat(event.target.value));
+                }
+            };
+            slider.addEventListener('change', sendUpdate);
+            input.addEventListener('change', sendUpdate);
+        }
+        setupSliderSync('Kp_slider', 'Kp_input', 'set_kp', 3);
+        setupSliderSync('Ki_slider', 'Ki_input', 'set_ki', 4);
+        setupSliderSync('Kd_slider', 'Kd_input', 'set_kd', 2);
+        setupSliderSync('Gain_slider', 'Gain_input', 'set_gain', 1);
+
+        // ROI save button (Note: Applying ROI requires an agent restart)
+        document.getElementById('btn_save_roi').addEventListener('click', () => {
+            alert("ROI settings saved to config.json. Please restart the agent to apply them.");
+            sendControlCommand('save_config'); // This will trigger the backend save function
+        });
+    });
+</script>
+
+</body>
+</html>
