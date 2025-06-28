@@ -11,6 +11,7 @@ The primary goal of this project is to learn, enhance, and showcase skills in Co
 ### Live Demonstration
 
 ![Agent in Action](assets/images/agent_in_action.gif)
+
 *The agent autonomously navigating a turn by tracking the center lane.*
 
 ---
